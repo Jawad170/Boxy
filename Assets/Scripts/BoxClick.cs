@@ -18,7 +18,7 @@ public class BoxClick : MonoBehaviour {
 
 
             Vector3 MouseClickPos = Input.mousePosition;
-            MouseClickPos.Set(MouseClickPos.x - 50.0f, MouseClickPos.y - 225.0f, 4.6f);
+            MouseClickPos.Set(MouseClickPos.x - 50.0f, MouseClickPos.y - Screen.height, 4.6f);
             GameObject.Find("Text_Coins").GetComponent<RectTransform>().anchoredPosition = MouseClickPos;
         }
 
