@@ -15,9 +15,13 @@ public class BoxClick : MonoBehaviour {
             Clicked = true;
             GetComponent<BoxyDetails>().PaintJob(GetComponent<BoxyDetails>().BoxyType + 100);
             FadeOut(fadeTime);
+
+
+            Vector3 MouseClickPos = Input.mousePosition;
+            MouseClickPos.Set(MouseClickPos.x - 50.0f, MouseClickPos.y - 225.0f, 4.6f);
+            GameObject.Find("Text_Coins").GetComponent<RectTransform>().anchoredPosition = MouseClickPos;
         }
 
-        //Destroy(gameObject);
     }
 
 
