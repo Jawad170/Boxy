@@ -446,7 +446,7 @@ namespace CircularGravityForce
             {
                 if (attachGameObject != null)
                 {
-                    if (touchedObject.transform.FindChild(SpecialEffectGameObject) == null)
+                    if (touchedObject.transform.Find(SpecialEffectGameObject) == null)
                     {
                         GameObject newAttachGameObject = Instantiate(attachGameObject, touchedObject.gameObject.transform.position, attachGameObject.gameObject.transform.rotation) as GameObject;
                         newAttachGameObject.name = SpecialEffectGameObject;
@@ -460,9 +460,9 @@ namespace CircularGravityForce
             {
                 if (touchedObject != null && attachGameObject != null)
                 {
-                    if (touchedObject.transform.FindChild(SpecialEffectGameObject) != null)
+                    if (touchedObject.transform.Find(SpecialEffectGameObject) != null)
                     {
-                        Destroy(touchedObject.transform.FindChild(SpecialEffectGameObject).gameObject);
+                        Destroy(touchedObject.transform.Find(SpecialEffectGameObject).gameObject);
                     }
                 }
             }

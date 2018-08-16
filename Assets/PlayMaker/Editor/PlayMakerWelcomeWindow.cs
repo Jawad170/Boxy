@@ -1,4 +1,4 @@
-﻿// (c) Copyright HutongGames, LLC 2010-2011. All rights reserved.
+﻿// (c) Copyright HutongGames, LLC 2010-2018. All rights reserved.
 
 #if (UNITY_4_3 || UNITY_4_5 || UNITY_4_6 || UNITY_4_7 || UNITY_5_0) 
 #define UNITY_PRE_5_1
@@ -17,34 +17,28 @@ namespace HutongGames.PlayMakerEditor
     [InitializeOnLoad]
     public class PlayMakerWelcomeWindow : EditorWindow
     {
-        private const string installCurrentVersion = "1.7.8.4";
-        private const string installBetaVersion = "1.8.0 BETA RC40";
+        // Remember to update version info since it's used by export scripts!
+        public const string InstallCurrentVersion = "1.9.0";
+        public const string InstallAssemblyVersion = "1.9.0.p4";
+        public const string InstallBetaVersion = "";
+        public const string Version = InstallCurrentVersion + " " + InstallBetaVersion;
 
-        private const string editorPrefsLastVersion = "PlayMaker.LastVersion";
-        private const string editorPrefsShowAtStartup = "PlayMaker.ShowWelcomeScreen";
         private const string editorPrefsSavedPage = "PlayMaker.WelcomeScreenPage";
-        private const string editorPrefsShowUpgradeGuide = "PlayMaker.ShowUpgradeGuide";
         private const string urlSamples = "http://www.hutonggames.com/samples.php";
         private const string urlTutorials = "http://www.hutonggames.com/tutorials.html";
         private const string urlDocs = "https://hutonggames.fogbugz.com/default.asp?W1";
         private const string urlForums = "http://hutonggames.com/playmakerforum/index.php";
-        private const string urlPhotonAddon = "https://hutonggames.fogbugz.com/default.asp?W928";
-        private const string urlAddonsWiki = "https://hutonggames.fogbugz.com/default.asp?W714";
-        private const string urlEcosystemWiki = "https://hutonggames.fogbugz.com/default.asp?W1181";
-        //private const string urlStore = "http://www.hutonggames.com/store.html";
-        //private const string photonID = "1786";
 
         private const float windowWidth = 500;
         private const float windowHeight = 440;
         private const float pageTop = 70;
         private const float pagePadding = 95;
 
-        private static bool setupPhoton;
-
         private static string currentVersion;
         private static string currentVersionLabel;
         private static string currentVersionShort;
         private static int majorVersion; // 1.8 -> 18 for easier comparisons
+        private static bool isStudentVersion;
 
         private enum Page
         {
@@ -67,59 +61,38 @@ namespace HutongGames.PlayMakerEditor
         private const float transitionDuration = 0.5f;
 
         private Vector2 scrollPosition;
-        private static bool showAtStartup;
         
         private static GUIStyle playMakerHeader;
         private static GUIStyle labelWithWordWrap;
         private static GUIStyle largeTitleWithLogo;
         private static GUIStyle versionLabel;
         private static Texture samplesIcon;
+        private static Texture checkIcon;
         private static Texture docsIcon;
         private static Texture videosIcon;
         private static Texture forumsIcon;
         private static Texture addonsIcon;
-        private static Texture photonIcon;
         private static Texture backButton;
 
         private static bool stylesInitialized;
 
-        [MenuItem("PlayMaker/Welcome Screen", false, 45)]
+#if PLAYMAKER_1_9_0
+        [MenuItem("PlayMaker/Welcome Screen", false, 500)]
+#elif PLAYMAKER
+        [MenuItem("PlayMaker/Update PlayMaker", false, 500)]
+#else
+        [MenuItem("PlayMaker/Install PlayMaker", false, 500)]
+#endif
         public static void OpenWelcomeWindow()
         {
-            GetWindow<PlayMakerWelcomeWindow>(true);
+            var window = GetWindow<PlayMakerWelcomeWindow>(true);
+            window.SetPage(Page.Welcome);
+            PlayMakerAddonManager.ResetView();
         }
 
-        static PlayMakerWelcomeWindow()
-        {
-            EditorApplication.playmodeStateChanged -= OnPlayModeChanged;
-            EditorApplication.playmodeStateChanged += OnPlayModeChanged;
-
-            showAtStartup = EditorPrefs.GetBool(editorPrefsShowAtStartup, true) ||
-                            EditorPrefs.GetString(editorPrefsLastVersion, "") != installBetaVersion;
-            if (showAtStartup)
-            {
-                // Delay until first update
-                EditorApplication.update -= OpenAtStartup;
-                EditorApplication.update += OpenAtStartup;
-            }
-            
-            // Only show first time
-            EditorPrefs.SetString(editorPrefsLastVersion, installBetaVersion);
-        }
-
-        static void OnPlayModeChanged()
-        {
-            //Debug.Log("OnPlayModeChanged - remove welcome callback");
-
-            // don't show welcome screen on playmode change
-            EditorApplication.update -= OpenAtStartup;
-            EditorApplication.playmodeStateChanged -= OnPlayModeChanged;
-        }
-
-        static void OpenAtStartup()
+        public static void Open()
         {
             OpenWelcomeWindow();
-            EditorApplication.update -= OpenAtStartup;
         }
 
         public void OnEnable()
@@ -131,12 +104,15 @@ namespace HutongGames.PlayMakerEditor
 #endif
             maxSize = new Vector2(windowWidth, windowHeight);
             minSize = maxSize;
- 
+
             // Try to get current playmaker version if installed
             GetPlayMakerVersion();
 
-            // Is PlayMakerPhotonWizard available?
-            setupPhoton = GetType("PlayMakerPhotonWizard") != null;
+            // Is this the install for the student version?
+            isStudentVersion = AssetGUIDs.IsStudentVersionInstall();
+
+            // Init add-ons manager
+            PlayMakerAddonManager.Init();
 
             // Setup pages
 
@@ -146,30 +122,34 @@ namespace HutongGames.PlayMakerEditor
             backButtonRect = new Rect(0, windowHeight-24, 123, 24);
 
             // Save page to survive recompile...?
-            //currentPage = (Page)EditorPrefs.GetInt(editorPrefsPage, (int)Page.Welcome);
+            currentPage = (Page)EditorPrefs.GetInt(editorPrefsSavedPage, (int)Page.Welcome);
             
-            currentPage = Page.Welcome;
+            //currentPage = Page.Welcome;
 
             // We want to show the Upgrade Guide after installing
-            // However, installation forces a recompile so we save an EditorPref
 
-            var showUpgradeGuide = EditorPrefs.GetBool(editorPrefsShowUpgradeGuide, false);
-            if (showUpgradeGuide)
+            /*
+            if (EditorStartupPrefs.ShowUpgradeGuide)
             {
-                //currentPage = Page.UpgradeGuide; //TODO: This was problematic, need a better solution
-                EditorPrefs.SetBool(editorPrefsShowUpgradeGuide, false); // reset
+                //currentPage = Page.UpgradeGuide; //TODO: This was problematic
+                EditorStartupPrefs.ShowUpgradeGuide = false; // reset
                 EditorUtility.DisplayDialog("PlayMaker",
                     "Please check the Upgrade Guide for more information on this release.", 
                     "OK");
-            }
+            }*/
 
             SetPage(currentPage);               
             Update();
         }
 
-        private void GetPlayMakerVersion()
+        protected void OnDisable()
         {
-            var versionInfo = GetType("HutongGames.PlayMakerEditor.VersionInfo");
+            PlayMakerAddonManager.SaveSettings();
+        }
+
+        private static void GetPlayMakerVersion()
+        {
+            var versionInfo = PlayMakerEditorStartup.GetType("HutongGames.PlayMakerEditor.VersionInfo");
             if (versionInfo != null)
             {
                 currentVersion = versionInfo.GetMethod("GetAssemblyInformationalVersion").Invoke(null, null) as string;
@@ -181,7 +161,7 @@ namespace HutongGames.PlayMakerEditor
                 }
                 else
                 {
-                    currentVersionLabel = "version unkown";
+                    currentVersionLabel = "version unknown";
                     currentVersionShort = "";
                     majorVersion = -1;
                 }
@@ -194,7 +174,7 @@ namespace HutongGames.PlayMakerEditor
             }
         }
 
-        private void InitStyles()
+        private static void InitStyles()
         {
             if (!stylesInitialized)
             {
@@ -229,11 +209,11 @@ namespace HutongGames.PlayMakerEditor
                 versionLabel = new GUIStyle(EditorStyles.label) { alignment = TextAnchor.LowerRight};
 
                 samplesIcon = (Texture) Resources.Load("linkSamples");
-                videosIcon = (Texture) Resources.Load("linkVideos");
+                checkIcon = (Texture)Resources.Load("linkCheck");
+                videosIcon = (Texture)Resources.Load("linkVideos");
                 docsIcon = (Texture) Resources.Load("linkDocs");
                 forumsIcon = (Texture) Resources.Load("linkForums");
                 addonsIcon = (Texture) Resources.Load("linkAddons");
-                photonIcon = (Texture) Resources.Load("photonIcon");
                 backButton = (Texture) Resources.Load("backButton");
             }
             stylesInitialized = true;
@@ -262,12 +242,7 @@ namespace HutongGames.PlayMakerEditor
             GUILayout.BeginHorizontal();                
             GUILayout.FlexibleSpace();
 
-            var show = GUILayout.Toggle(showAtStartup, "Show At Startup");
-            if (show != showAtStartup)
-            {
-                showAtStartup = show;
-                EditorPrefs.SetBool(editorPrefsShowAtStartup, showAtStartup);
-            }
+            EditorStartupPrefs.ShowWelcomeScreen = GUILayout.Toggle(EditorStartupPrefs.ShowWelcomeScreen, "Show At Startup");
 
             GUILayout.Space(10);
             GUILayout.EndHorizontal();
@@ -350,10 +325,20 @@ namespace HutongGames.PlayMakerEditor
             GUILayout.BeginVertical();
             GUILayout.FlexibleSpace();
 
-            DrawLink(samplesIcon,
-                     "Install PlayMaker",
-                     "Import the latest version of PlayMaker.",
-                     GotoPage, Page.Install);
+            if (isStudentVersion)
+            {
+                DrawLink(samplesIcon,
+                    "Install PlayMaker Student Version",
+                    "Import the latest student version of PlayMaker.",
+                    GotoPage, Page.Install);
+            }
+            else
+            {
+                DrawLink(samplesIcon,
+                    "Install PlayMaker",
+                    "Import the latest version of PlayMaker.",
+                    GotoPage, Page.Install);
+            }
 
             DrawLink(docsIcon,
                      "Upgrade Guide",
@@ -374,28 +359,46 @@ namespace HutongGames.PlayMakerEditor
             GUILayout.EndVertical();
         }
 
-        private void DoInstallPage()
+        private static void DoInstallPage()
         {
             ShowBackupHelpBox();
 
             GUILayout.BeginVertical();
             GUILayout.Space(30);
 
-            DrawLink(samplesIcon,
-                     "Install PlayMaker " + installCurrentVersion,
-                     "The current official release.",
-                     InstallLatest, null);
+            DrawLink(checkIcon,
+                     "Pre-Update Check",
+                     "Check for potential update issues.",
+                     PreUpdateCheck, null);
 
-            DrawLink(samplesIcon,
-                     "Install PlayMaker " + installBetaVersion,
-                     "The latest public beta version.",
-                     InstallBeta, null);
+            if (isStudentVersion)
+            {
+                DrawLink(samplesIcon,
+                    "Install PlayMaker Student Version " + InstallCurrentVersion,
+                    "The current official release.",
+                    InstallLatestStudent, null);
+            }
+            else
+            {
+                DrawLink(samplesIcon,
+                    "Install PlayMaker " + InstallCurrentVersion,
+                    "The current official release.",
+                    InstallLatest, null);
+            }
+
+            if (!string.IsNullOrEmpty(InstallBetaVersion))
+            {
+                DrawLink(samplesIcon,
+                         "Install PlayMaker " + InstallBetaVersion,
+                         "The latest public beta version.",
+                         InstallBeta, null);
+            }
 
             GUILayout.FlexibleSpace();
             GUILayout.EndVertical();
         }
 
-        private void DoGettingStartedPage()
+        private static void DoGettingStartedPage()
         {
             GUILayout.BeginVertical();
             GUILayout.FlexibleSpace();
@@ -426,16 +429,56 @@ namespace HutongGames.PlayMakerEditor
 
         private void DoUpgradeGuidePage()
         {
-            ShowBackupHelpBox();
-
             scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition);
 
-            GUILayout.Label("Version 1.8.0", EditorStyles.boldLabel);
-            EditorGUILayout.HelpBox("FSMs saved with 1.8.0 cannot be opened in earlier versions of PlayMaker! Please BACKUP projects!", MessageType.Warning);
+            ShowBackupHelpBox();
+
+            GUILayout.Label("Version 1.8+", EditorStyles.boldLabel);
+            EditorGUILayout.HelpBox(
+                "FSMs saved with 1.8+ cannot be opened in earlier versions of PlayMaker! Please BACKUP projects!",
+                MessageType.Warning);
+
+            GUILayout.Label("Version 1.8.6", EditorStyles.boldLabel);
+            EditorGUILayout.HelpBox(
+                "\nPlayMaker 1.8.6 is more strict about changes allowed in Prefab Instances: "+
+                "If a Prefab Instance is modified in a way that is incompatible with the Prefab Parent it will be disconnected. " +
+                "You can reconnect Instances using Apply or Revert." +
+                "\n",
+                MessageType.Warning);
+
+            GUILayout.Label("Version 1.8.5", EditorStyles.boldLabel);
+            EditorGUILayout.HelpBox(
+                "\nPlayMaker 1.8.5 moved LateUpdate handling to an optional component automatically added as needed.\n" +
+                "\nIf you have custom actions that use LateUpdate you must add this to OnPreprocess:\n" +
+                "\nFsm.HandleLateUpdate = true;\n" +
+                "\nSee Rotate.cs for an example." +
+                "\n",
+                MessageType.Warning);
+
+            GUILayout.Label("Version 1.8.2", EditorStyles.boldLabel);
+            EditorGUILayout.HelpBox("\nPlayMaker 1.8.2 added the following system events:\n" +
+                                    "\nMOUSE UP AS BUTTON, JOINT BREAK, JOINT BREAK 2D, PARTICLE COLLISION." +
+                                    "\n\nPlease remove any custom proxy components you used before to send these events." +
+                                    "\n",
+                                    MessageType.Warning);
+
+            GUILayout.Label("Version 1.8.1", EditorStyles.boldLabel);
+            EditorGUILayout.HelpBox("\nPlayMaker 1.8.1 integrated the following add-ons and actions:\n"+
+                                    "\n- Physics2D Add-on" +
+                                    "\n- Mecanim Animator Add-on" +
+                                    "\n- Vector2, Quaternion, and Trigonometry actions"+
+                                    "\n\nThe new versions of these files are under \"Assets/PlayMaker/Actions\""+
+                                    "\n\nIf you imported these add-ons, the old versions are likely under \"Assets/PlayMaker Custom Actions\". "+
+                                    "If you get errors from duplicate files after updating please delete the old files!" +
+                                    "\n", 
+                                    MessageType.Warning);
 
             GUILayout.Label("Unity 5 Upgrade Notes", EditorStyles.boldLabel);
-            EditorGUILayout.HelpBox("If you run into problems updating a Unity 4.x project please check the Troubleshooting guide on the PlayMaker Wiki.", MessageType.Warning);
-            EditorGUILayout.HelpBox("Unity 5 removed component property shortcuts from GameObject. " +
+            EditorGUILayout.HelpBox(
+                "\nIf you run into problems updating a Unity 4.x project please check the Troubleshooting guide on the PlayMaker Wiki." +
+                "\n",
+                MessageType.Warning);
+            EditorGUILayout.HelpBox("\nUnity 5 removed component property shortcuts from GameObject. " +
                                     "\n\nThe Unity auto update process replaces these properties with GetComponent calls. " +
                                     "In many cases this is fine, but some third party actions and addons might need manual updating! " +
                                     "Please post on the PlayMaker forums and contact the original authors for help." +
@@ -445,58 +488,30 @@ namespace HutongGames.PlayMakerEditor
                                     "\n", MessageType.Warning);
 
             GUILayout.Label("Unity 4.6 Upgrade Notes", EditorStyles.boldLabel);
-            EditorGUILayout.HelpBox("Find support for the new Unity GUI online in our Addons page.", MessageType.Info);
-            EditorGUILayout.HelpBox("PlayMakerGUI is only needed if you use OnGUI Actions. " +
-                                    "If you don't use OnGUI actions un-check Auto-Add PlayMakerGUI in PlayMaker Preferences.", MessageType.Info);
+            EditorGUILayout.HelpBox("\nFind support for the new Unity GUI online in our Addons page.\n", MessageType.Info);
+            EditorGUILayout.HelpBox("\nPlayMakerGUI is only needed if you use OnGUI Actions. " +
+                                    "If you don't use OnGUI actions un-check Auto-Add PlayMakerGUI in PlayMaker Preferences.\n", MessageType.Info);
 
             EditorGUILayout.EndScrollView();
             //FsmEditorGUILayout.Divider();
         }
 
-        private void DoAddonsPage()
+        private static void DoAddonsPage()
         {
-            GUILayout.BeginVertical();
-            GUILayout.FlexibleSpace();
-            if (setupPhoton)
-            {
-                DrawLink(photonIcon,
-                     "Photon Cloud",
-                     "Build scalable MMOGs, FPS or any other multiplayer game " +
-                     "and application for PC, Mac, Browser, Mobile or Console.",
-                     LaunchPhotonSetupWizard, null);
-            }
-            else
-            {
-                DrawLink(photonIcon,
-                     "Photon Cloud",
-                     "Build scalable MMOGs, FPS or any other multiplayer game " +
-                     "and application for PC, Mac, Browser, Mobile or Console.",
-                     OpenUrl, urlPhotonAddon);
-            }
-
-            DrawLink(addonsIcon,
-                 "Ecosystem",
-                 "An integrated online browser for custom actions, samples and addons.",
-                 OpenUrl, urlEcosystemWiki);
-
-            DrawLink(addonsIcon,
-                 "Add-Ons",
-                 "Find action packs and add-ons for NGUI, 2D Toolkit, Mecanim, Pathfinding, Smooth Moves, Ultimate FPS...",
-                 OpenUrl, urlAddonsWiki);
-
-            GUILayout.FlexibleSpace();
-            GUILayout.EndVertical();
-
+            PlayMakerAddonManager.OnGUI();
         }
 
         private static void ShowBackupHelpBox()
         {
+            HelpBox("Always BACKUP projects before updating!\nUse Version Control to manage changes!", MessageType.Error);
+            //HelpBox("Unity 5.3: Upgrade to 1.8.0 to address compatibility issues!", MessageType.Error);
+            //HelpBox("Unity 5.4 Beta: Use 1.8.1 Beta to address compatibility issues!", MessageType.Error);
+        }
+
+        private static void HelpBox(string text, MessageType messageType)
+        {
             GUILayout.BeginHorizontal();
-            EditorGUILayout.HelpBox("Always BACKUP projects before updating!\nUse Version Control to manage changes!", MessageType.Error);
-            GUILayout.Space(5);
-            GUILayout.EndHorizontal();
-            GUILayout.BeginHorizontal();
-            EditorGUILayout.HelpBox("With Unity 5.3 please install the 1.8.0 Beta Version to address compatibility issues!", MessageType.Error);
+            EditorGUILayout.HelpBox(text, messageType);
             GUILayout.Space(5);
             GUILayout.EndHorizontal();
         }
@@ -520,9 +535,10 @@ namespace HutongGames.PlayMakerEditor
             var rect = GUILayoutUtility.GetLastRect();
             EditorGUIUtility.AddCursorRect(rect, MouseCursor.Link);
 
-            if (Event.current.type == EventType.mouseDown && rect.Contains(Event.current.mousePosition))
+            if (Event.current.type == EventType.MouseDown && rect.Contains(Event.current.mousePosition))
             {
                 func(userData);
+                GUIUtility.ExitGUI();
             }
 
             GUILayout.Space(10);
@@ -533,14 +549,14 @@ namespace HutongGames.PlayMakerEditor
             GUI.Box(backButtonRect, backButton, GUIStyle.none);
             EditorGUIUtility.AddCursorRect(backButtonRect, MouseCursor.Link);
 
-            if (Event.current.type == EventType.mouseDown && backButtonRect.Contains(Event.current.mousePosition))
+            if (Event.current.type == EventType.MouseDown && backButtonRect.Contains(Event.current.mousePosition))
             {
                 GotoPage(toPage);
                 GUIUtility.ExitGUI();
             }
         }
 
-        void Update()
+        private void Update()
         {
             if (pageInTransition)
             {
@@ -548,7 +564,7 @@ namespace HutongGames.PlayMakerEditor
             }
         }
 
-        void DoPageTransition()
+        private void DoPageTransition()
         {
             var t = (Time.realtimeSinceStartup - transitionStartTime) / transitionDuration;
             if (t > 1f)
@@ -565,7 +581,7 @@ namespace HutongGames.PlayMakerEditor
             Repaint();
         }
 
-        bool DisplayInstallDialog(string versionInfo, string notes)
+        private static bool DisplayInstallDialog(string versionInfo, string notes)
         {
             return EditorUtility.DisplayDialog("PlayMaker", "Install PlayMaker " + versionInfo + "\n" + 
                 notes + "\n\nAlways backup projects before updating Unity or PlayMaker!",
@@ -576,35 +592,43 @@ namespace HutongGames.PlayMakerEditor
 
         public delegate void LinkFunction(object userData);
 
-        private void InstallLatest(object userData)
+        private static void PreUpdateCheck(object userData)
         {
-            if (majorVersion > 17 && EditorUtility.DisplayDialog("PlayMaker", "This project uses a newer version of PlayMaker not compatible with 1.7.8.4. Installing 1.7.8.4 is NOT a good idea!", "Cancel", "Do it anyway!"))
-            {
-                return;
-            }
+            PreUpdateChecker.Open();
+        }
 
-            if (DisplayInstallDialog(installCurrentVersion, "The latest release version of PlayMaker."))
+        private static void InstallLatest(object userData)
+        {
+            if (DisplayInstallDialog(InstallCurrentVersion, "The latest release version of PlayMaker." +
+                                                        "\n\nNOTE: Projects saved with PlayMaker 1.8+ cannot be opened in older versions of PlayMaker!"))
             {
-                EditorPrefs.SetBool(editorPrefsShowUpgradeGuide, true);
-                //ImportPackage("Assets/PlayMaker/Editor/Install/PlayMaker.1.7.8.4.unitypackage");
-                // Use GUID in case user has moved Playmaker folder
-                ImportPackage(AssetDatabase.GUIDToAssetPath("dd583cbbf618ba54983cdf396b28e49b"));
+                EditorStartupPrefs.ShowUpgradeGuide = true; // show upgrade guide after importing
+                ImportPackage(AssetDatabase.GUIDToAssetPath(AssetGUIDs.LatestInstall));
             }
         }
 
-        private void InstallBeta(object userData)
+        private static void InstallLatestStudent(object userData)
         {
-            if (DisplayInstallDialog(installBetaVersion, "The latest BETA version of PlayMaker." +
-                                                        "\n\nNOTE: Projects saved with PlayMaker 1.8.0 cannot be opened in older versions of PlayMaker!"))
+            if (DisplayInstallDialog("Student Version " + InstallCurrentVersion, "The latest student version of PlayMaker." +
+                                                            "\n\nNOTE: The Student Version is limited to built in actions only."))
             {
-                EditorPrefs.SetBool(editorPrefsShowUpgradeGuide, true);
-                //ImportPackage("Assets/PlayMaker/Editor/Install/PlayMaker.1.8.0.unitypackage");
-                // Use GUID in case user has moved Playmaker folder
-                ImportPackage(AssetDatabase.GUIDToAssetPath("f982487afa4f0444ea11e90a9d05b94e"));
+                EditorStartupPrefs.ShowUpgradeGuide = true; // show upgrade guide after importing
+                ImportPackage(AssetDatabase.GUIDToAssetPath(AssetGUIDs.LatestStudentInstall));
             }
         }
 
-        private void ImportPackage(string package)
+        private static void InstallBeta(object userData)
+        {
+            /*
+            if (DisplayInstallDialog(InstallBetaVersion, "The latest BETA version of PlayMaker." +
+                                                        "\n\nNOTE: Projects saved with PlayMaker 1.8+ cannot be opened in older versions of PlayMaker!"))
+            {
+                EditorStartupPrefs.ShowUpgradeGuide = true; // show upgrade guide after importing
+                ImportPackage(AssetDatabase.GUIDToAssetPath(AssetGUIDs.PlayMakerUnitypackage181));
+            }*/
+        }
+
+        private static void ImportPackage(string package)
         {
             try
             {
@@ -621,12 +645,7 @@ namespace HutongGames.PlayMakerEditor
             //GotoPage(Page.UpgradeGuide);
         }
 
-        private void LaunchPhotonSetupWizard(object userData)
-        {
-            GetType("PlayMakerPhotonWizard").GetMethod("Init").Invoke(null, null);
-        }
-
-        private void OpenUrl(object userData)
+        private static void OpenUrl(object userData)
         {
             Application.OpenURL(userData as string);
         }
@@ -641,6 +660,12 @@ namespace HutongGames.PlayMakerEditor
             nextPage = (Page)userData;
             pageInTransition = true;
             transitionStartTime = Time.realtimeSinceStartup;
+
+            /* Always open PreUpdateChecker...?
+            if (nextPage == Page.Install)
+            {
+                PreUpdateChecker.Open();
+            }*/
 
             // next page slides in from the right
             // welcome screen slides offscreen left
@@ -675,43 +700,16 @@ namespace HutongGames.PlayMakerEditor
             EditorPrefs.SetInt(editorPrefsSavedPage, (int)currentPage);
         }
 
-        // Normally we would use ReflectionUtils.GetGlobalType but this window now needs to be standalone
-        // Instead of copy/pasting ReflectionUtils, decided to try this code from UnityAnswers:
-        // http://answers.unity3d.com/questions/206665/typegettypestring-does-not-work-in-unity.html
+        [Obsolete("Use PlayMakerEditorStartup.GetType instead.")]
         public static Type GetType(string typeName)
         {
-            // Try Type.GetType() first. This will work with types defined
-            // by the Mono runtime, in the same assembly as the caller, etc.
-            var type = Type.GetType(typeName);
-
-            // If it worked, then we're done here
-            if (type != null)
-                return type;
-
-            // otherwise look in loaded assemblies
-            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
-            {
-                type = assembly.GetType(typeName);
-                if (type != null)
-                {
-                    break;
-                }
-            }
-
-            return type;
+            return PlayMakerEditorStartup.GetType(typeName);
         }
 
+        [Obsolete("Use PlayMakerEditorStartup.FindTypeInLoadedAssemblies instead.")]
         public static Type FindTypeInLoadedAssemblies(string typeName)
         {
-            Type _type = null;
-            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
-            {
-                _type = assembly.GetType(typeName);
-                if (_type != null)
-                    break;
-            }
-
-            return _type;
+            return PlayMakerEditorStartup.FindTypeInLoadedAssemblies(typeName);
         }
     }
 }

@@ -5,6 +5,7 @@ using System.Collections.Generic;
 
 namespace HutongGames.PlayMaker.Actions
 {
+    [NoActionTargets]
 	[ActionCategory(ActionCategory.Array)]
 	[Tooltip("Transfer a value from one array to another, basically a copy/cut paste action on steroids.")]
 	public class ArrayTransferValue : FsmStateAction
@@ -37,7 +38,6 @@ namespace HutongGames.PlayMaker.Actions
 		[ActionSection("Result")]
 
 		[Tooltip("Event sent if this array source does not contains that element (described below)")]
-		[UIHint(UIHint.FsmEvent)]
 		public FsmEvent indexOutOfRange;
 
 		public override void Reset ()

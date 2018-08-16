@@ -19,7 +19,7 @@ namespace HutongGames.PlayMakerEditor
 
         public override void OnSceneGUI()
         {
-            var setCameraFOVAction = (SetCameraFOV) target;
+            var setCameraFOVAction = (HutongGames.PlayMaker.Actions.SetCameraFOV)target;
             if (setCameraFOVAction.fieldOfView.IsNone)
             {
                 return;

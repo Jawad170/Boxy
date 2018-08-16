@@ -8,7 +8,7 @@ using System.Collections;
 
 namespace HutongGames.PlayMakerEditor
 {
-    [CustomActionEditor(typeof (GetDistance))]
+    [CustomActionEditor(typeof(HutongGames.PlayMaker.Actions.GetDistance))]
     public class GetDistanceEditor : CustomActionEditor
     {
         public override bool OnGUI()
@@ -19,7 +19,7 @@ namespace HutongGames.PlayMakerEditor
         [Localizable(false)]
         public override void OnSceneGUI()
         {
-            var action = (GetDistance) target;
+            var action = (HutongGames.PlayMaker.Actions.GetDistance)target;
 
             var fromObject = action.Fsm.GetOwnerDefaultTarget(action.gameObject);
             var toObject = action.target;

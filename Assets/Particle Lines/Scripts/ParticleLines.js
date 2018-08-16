@@ -96,7 +96,7 @@ function SetLine(){
 
 function SortLifetime(){
 	CreateLine();
-	if(myParticlesX) myParticlesX.Sort(myParticlesX,function(g1,g2) Compare(g1.lifetime, g2.lifetime));
+	if(myParticlesX) myParticlesX.Sort(myParticlesX,function(g1,g2) Compare(g1.remainingLifetime, g2.remainingLifetime));
 }
 
 function SortDistance(){

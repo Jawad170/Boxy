@@ -1,10 +1,13 @@
 ﻿// (c) Copyright HutongGames, LLC 2010-2014. All rights reserved.
 
+using System;
 using UnityEngine;
 
 namespace HutongGames.PlayMaker.Actions
 {
 	[ActionCategory(ActionCategory.Array)]
+    [ActionTarget(typeof(PlayMakerFSM), "gameObject,fsmName")]
+    [Obsolete("This action was wip and accidentally released.")]
 	[Tooltip("Set an item in an Array Variable in another FSM.")]
 	public class FsmArraySet : FsmStateAction
 	{

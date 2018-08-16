@@ -41,6 +41,7 @@ namespace HutongGames.PlayMaker.Actions
 
 				foreach(FsmVar _var in variables)
 				{
+                    _var.UpdateValue();
 					array.Set(array.Length-count,_var.GetValue());
 					count--;
 				}
